@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "🚀 Starting QA Test Case Manager..."
+echo ""
+
+# Kill any process on port 3000
+lsof -ti:3000 | xargs kill -9 2>/dev/null
+
+# Wait a moment
+sleep 1
+
+# Open browser
+open http://localhost:3000 2>/dev/null || true
+
+# Start Next.js dev server
+npm run dev
+
