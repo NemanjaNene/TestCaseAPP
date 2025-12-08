@@ -6,7 +6,7 @@ import { Save, X } from 'lucide-react'
 
 interface TestCaseFormProps {
   testCase?: TestCase | null
-  onSubmit: (data: Omit<TestCase, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>) => void
+  onSubmit: (data: Omit<TestCase, 'id' | 'projectId' | 'suiteId' | 'createdAt' | 'updatedAt'>) => void
   onCancel: () => void
 }
 

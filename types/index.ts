@@ -13,9 +13,19 @@ export interface Project {
   updatedAt: string
 }
 
+export interface TestSuite {
+  id: string
+  projectId: string
+  name: string
+  description: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface TestCase {
   id: string
   projectId: string
+  suiteId: string
   title: string
   description: string
   preconditions: string
@@ -28,5 +38,6 @@ export interface TestCase {
 export interface AppState {
   currentUser: User | null
   projects: Project[]
+  testSuites: TestSuite[]
   testCases: TestCase[]
 }

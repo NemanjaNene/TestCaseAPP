@@ -1,4 +1,4 @@
-import { User, Project, TestCase } from '@/types'
+import { User, Project, TestSuite, TestCase } from '@/types'
 import { 
   collection, 
   getDocs, 
@@ -134,6 +134,103 @@ export const subscribeToProjects = (callback: (projects: Project[]) => void): Un
 }
 
 // ============================================
+// TEST SUITES (Firebase or Local Storage)
+// ============================================
+export const loadTestSuites = async (): Promise<TestSuite[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    if (typeof window === 'undefined') return []
+    const data = localStorage.getItem('qa_test_suites')
+    return data ? JSON.parse(data) : []
+  }
+
+  try {
+    const querySnapshot = await getDocs(collection(db, 'testSuites'))
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestSuite))
+  } catch (error) {
+    console.error('Error loading test suites from Firebase:', error)
+    return []
+  }
+}
+
+export const loadTestSuitesByProject = async (projectId: string): Promise<TestSuite[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    const allSuites = await loadTestSuites()
+    return allSuites.filter(s => s.projectId === projectId)
+  }
+
+  try {
+    const q = query(collection(db, 'testSuites'), where('projectId', '==', projectId))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestSuite))
+  } catch (error) {
+    console.error('Error loading test suites by project from Firebase:', error)
+    return []
+  }
+}
+
+export const saveTestSuite = async (testSuite: Omit<TestSuite, 'id'>): Promise<string> => {
+  if (!isFirebaseConfigured() || !db) {
+    const newSuite = { ...testSuite, id: Date.now().toString() }
+    const suites = await loadTestSuites()
+    const updated = [...suites, newSuite]
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_suites', JSON.stringify(updated))
+    }
+    return newSuite.id
+  }
+
+  try {
+    const docRef = await addDoc(collection(db, 'testSuites'), testSuite)
+    return docRef.id
+  } catch (error) {
+    console.error('Error saving test suite to Firebase:', error)
+    throw error
+  }
+}
+
+export const deleteTestSuite = async (suiteId: string): Promise<void> => {
+  if (!isFirebaseConfigured() || !db) {
+    const suites = await loadTestSuites()
+    const updated = suites.filter(s => s.id !== suiteId)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_suites', JSON.stringify(updated))
+    }
+    return
+  }
+
+  try {
+    await deleteDoc(doc(db, 'testSuites', suiteId))
+  } catch (error) {
+    console.error('Error deleting test suite from Firebase:', error)
+    throw error
+  }
+}
+
+export const subscribeToTestSuites = (projectId: string, callback: (suites: TestSuite[]) => void): Unsubscribe | null => {
+  if (!isFirebaseConfigured() || !db) return null
+
+  try {
+    const q = query(collection(db, 'testSuites'), where('projectId', '==', projectId))
+    return onSnapshot(q, (snapshot) => {
+      const suites = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as TestSuite))
+      callback(suites)
+    })
+  } catch (error) {
+    console.error('Error subscribing to test suites:', error)
+    return null
+  }
+}
+
+// ============================================
 // TEST CASES (Firebase or Local Storage)
 // ============================================
 export const loadTestCases = async (): Promise<TestCase[]> => {
@@ -172,6 +269,25 @@ export const loadTestCasesByProject = async (projectId: string): Promise<TestCas
     } as TestCase))
   } catch (error) {
     console.error('Error loading test cases by project from Firebase:', error)
+    return []
+  }
+}
+
+export const loadTestCasesBySuite = async (suiteId: string): Promise<TestCase[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    const allTestCases = await loadTestCases()
+    return allTestCases.filter(tc => tc.suiteId === suiteId)
+  }
+
+  try {
+    const q = query(collection(db, 'testCases'), where('suiteId', '==', suiteId))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestCase))
+  } catch (error) {
+    console.error('Error loading test cases by suite from Firebase:', error)
     return []
   }
 }
@@ -254,6 +370,24 @@ export const subscribeToTestCases = (projectId: string, callback: (testCases: Te
     })
   } catch (error) {
     console.error('Error subscribing to test cases:', error)
+    return null
+  }
+}
+
+export const subscribeToTestCasesBySuite = (suiteId: string, callback: (testCases: TestCase[]) => void): Unsubscribe | null => {
+  if (!isFirebaseConfigured() || !db) return null
+
+  try {
+    const q = query(collection(db, 'testCases'), where('suiteId', '==', suiteId))
+    return onSnapshot(q, (snapshot) => {
+      const testCases = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as TestCase))
+      callback(testCases)
+    })
+  } catch (error) {
+    console.error('Error subscribing to test cases by suite:', error)
     return null
   }
 }
