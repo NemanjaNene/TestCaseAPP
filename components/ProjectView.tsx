@@ -9,7 +9,8 @@ import {
   deleteTestSuite,
   subscribeToTestSuites,
   loadTestCasesByProject,
-  deleteTestCase
+  deleteTestCase,
+  subscribeToTestCases
 } from '@/utils/storage'
 import CreateTestSuiteModal from './CreateTestSuiteModal'
 import TestSuiteView from './TestSuiteView'
@@ -27,6 +28,17 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  const refreshTestCaseCounts = async () => {
+    const testCases = await loadTestCasesByProject(project.id)
+    const counts: Record<string, number> = {}
+    testCases.forEach(tc => {
+      if (tc.suiteId) {
+        counts[tc.suiteId] = (counts[tc.suiteId] || 0) + 1
+      }
+    })
+    setTestCaseCounts(counts)
+  }
+
   useEffect(() => {
     // Load initial test suites
     loadTestSuitesByProject(project.id).then(data => {
@@ -34,24 +46,37 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
       setLoading(false)
     })
 
-    // Load test case counts for each suite
-    loadTestCasesByProject(project.id).then(testCases => {
+    // Load test case counts
+    refreshTestCaseCounts()
+
+    // Subscribe to real-time updates for suites
+    const unsubscribeSuites = subscribeToTestSuites(project.id, (updatedSuites) => {
+      setTestSuites(updatedSuites)
+    })
+
+    // Subscribe to real-time updates for test cases (to update counts)
+    const unsubscribeTestCases = subscribeToTestCases(project.id, (testCases) => {
       const counts: Record<string, number> = {}
       testCases.forEach(tc => {
-        counts[tc.suiteId] = (counts[tc.suiteId] || 0) + 1
+        if (tc.suiteId) {
+          counts[tc.suiteId] = (counts[tc.suiteId] || 0) + 1
+        }
       })
       setTestCaseCounts(counts)
     })
 
-    // Subscribe to real-time updates
-    const unsubscribe = subscribeToTestSuites(project.id, (updatedSuites) => {
-      setTestSuites(updatedSuites)
-    })
-
     return () => {
-      if (unsubscribe) unsubscribe()
+      if (unsubscribeSuites) unsubscribeSuites()
+      if (unsubscribeTestCases) unsubscribeTestCases()
     }
   }, [project.id])
+
+  // Refresh counts when coming back from suite view
+  useEffect(() => {
+    if (!selectedSuite) {
+      refreshTestCaseCounts()
+    }
+  }, [selectedSuite])
 
   const handleCreateSuite = async (name: string, description: string) => {
     const newSuite: Omit<TestSuite, 'id'> = {
