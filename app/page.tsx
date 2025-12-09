@@ -114,17 +114,6 @@ export default function Home() {
             </button>
           </form>
 
-          <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <p className="text-sm text-gray-300 mb-2">
-              <strong>Default credentials:</strong>
-            </p>
-            <p className="text-sm text-gray-400">
-              Username: <code className="text-blue-400">admin</code>
-            </p>
-            <p className="text-sm text-gray-400">
-              Password: <code className="text-blue-400">admin123</code>
-            </p>
-          </div>
         </div>
       </div>
     </main>

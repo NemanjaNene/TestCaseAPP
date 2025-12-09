@@ -22,9 +22,9 @@ export const loadUsers = (): User[] => {
   if (!data) {
     const defaultUsers = [{ 
       id: '1', 
-      username: 'admin', 
-      password: 'admin123',
-      name: 'Administrator' 
+      username: 'Comitqa', 
+      password: 'Comitqa123',
+      name: 'Comit Team' 
     }]
     saveUsers(defaultUsers)
     return defaultUsers
