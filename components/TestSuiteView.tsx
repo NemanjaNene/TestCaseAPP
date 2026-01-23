@@ -46,7 +46,7 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
     }
   }, [suite.id])
 
-  const handleCreateTestCase = async (testCaseData: Omit<TestCase, 'id' | 'projectId' | 'suiteId' | 'createdAt' | 'updatedAt'>) => {
+  const handleCreateTestCase = async (testCaseData: Omit<TestCase, 'id' | 'projectId' | 'suiteId' | 'order' | 'createdAt' | 'updatedAt'>) => {
     // Calculate next order value (append to end)
     const maxOrder = testCases.length > 0 
       ? Math.max(...testCases.map(tc => tc.order ?? 0))
@@ -73,7 +73,7 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
     }
   }
 
-  const handleUpdateTestCase = async (testCaseData: Omit<TestCase, 'id' | 'projectId' | 'suiteId' | 'createdAt' | 'updatedAt'>) => {
+  const handleUpdateTestCase = async (testCaseData: Omit<TestCase, 'id' | 'projectId' | 'suiteId' | 'order' | 'createdAt' | 'updatedAt'>) => {
     if (!editingTestCase) return
 
     try {
