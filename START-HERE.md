@@ -14,6 +14,8 @@ npm install
 - Username: `admin`
 - Password: `admin123`
 
+-URL: https://test-case-app-tau.vercel.app/
+
 ---
 
 ## 📚 Kompletna Dokumentacija

@@ -1,17 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TestCase } from '@/types'
-import { FileText, Edit2, Trash2, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
+import { FileText, Edit2, Trash2, Calendar, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
 
 interface TestCaseListProps {
   testCases: TestCase[]
   onEdit: (testCase: TestCase) => void
   onDelete: (testCaseId: string) => void
+  onReorder: (reorderedTestCases: TestCase[]) => void
 }
 
-export default function TestCaseList({ testCases, onEdit, onDelete }: TestCaseListProps) {
+export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }: TestCaseListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [localTestCases, setLocalTestCases] = useState<TestCase[]>(testCases)
+
+  // Update local state when props change (from parent or firebase)
+  useEffect(() => {
+    if (!draggedId) {
+      setLocalTestCases(testCases)
+    }
+  }, [testCases, draggedId])
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -26,14 +37,78 @@ export default function TestCaseList({ testCases, onEdit, onDelete }: TestCaseLi
   }
 
   const expandAll = () => {
-    setExpandedIds(new Set(testCases.map(tc => tc.id)))
+    setExpandedIds(new Set(localTestCases.map(tc => tc.id)))
   }
 
   const collapseAll = () => {
     setExpandedIds(new Set())
   }
 
-  if (testCases.length === 0) {
+  const handleDragStart = (e: React.DragEvent, testCaseId: string) => {
+    setDraggedId(testCaseId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e: React.DragEvent, testCaseId: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    
+    if (draggedId && draggedId !== testCaseId) {
+      setDragOverId(testCaseId)
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent, testCaseId: string) => {
+    e.preventDefault()
+    
+    if (draggedId && draggedId !== testCaseId) {
+      // Reorder locally for smooth visual feedback
+      const draggedIndex = localTestCases.findIndex(tc => tc.id === draggedId)
+      const targetIndex = localTestCases.findIndex(tc => tc.id === testCaseId)
+
+      if (draggedIndex === -1 || targetIndex === -1) return
+
+      // Create new array with item moved to target position
+      const reordered = [...localTestCases]
+      const [draggedItem] = reordered.splice(draggedIndex, 1)
+      reordered.splice(targetIndex, 0, draggedItem)
+
+      // Update local state immediately for visual feedback
+      setLocalTestCases(reordered)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    
+    // Save the final order
+    if (draggedId) {
+      const updatedTestCases = localTestCases.map((tc, index) => ({
+        ...tc,
+        order: index
+      }))
+      onReorder(updatedTestCases)
+    }
+    
+    setDraggedId(null)
+    setDragOverId(null)
+  }
+
+  const handleDragEnd = () => {
+    // Save the final order
+    if (draggedId) {
+      const updatedTestCases = localTestCases.map((tc, index) => ({
+        ...tc,
+        order: index
+      }))
+      onReorder(updatedTestCases)
+    }
+    
+    setDraggedId(null)
+    setDragOverId(null)
+  }
+
+  if (localTestCases.length === 0) {
     return (
       <div className="card text-center py-16">
         <FileText className="w-20 h-20 text-gray-600 mx-auto mb-4" />
@@ -49,7 +124,7 @@ export default function TestCaseList({ testCases, onEdit, onDelete }: TestCaseLi
         <div className="flex items-center gap-3">
           <FileText className="w-6 h-6 text-blue-400" />
           <h2 className="text-3xl font-bold">Test Cases</h2>
-          <span className="text-sm text-gray-500">({testCases.length})</span>
+          <span className="text-sm text-gray-500">({localTestCases.length})</span>
         </div>
         <div className="flex gap-2">
           <button
@@ -68,17 +143,38 @@ export default function TestCaseList({ testCases, onEdit, onDelete }: TestCaseLi
       </div>
 
       <div className="space-y-3">
-        {testCases.map(testCase => {
+        {localTestCases.map(testCase => {
           const isExpanded = expandedIds.has(testCase.id)
+          const isDragging = draggedId === testCase.id
+          const isDragOver = dragOverId === testCase.id
           
           return (
-            <div key={testCase.id} className="card hover:border-blue-500/50 transition-all">
+            <div 
+              key={testCase.id} 
+              className={`card hover:border-blue-500/50 transition-all ${
+                isDragging ? 'opacity-50 scale-95' : ''
+              } ${
+                isDragOver ? 'border-blue-500 scale-105' : ''
+              }`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, testCase.id)}
+              onDragOver={(e) => handleDragOver(e, testCase.id)}
+              onDragEnter={(e) => handleDragEnter(e, testCase.id)}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+            >
               {/* Header - Always visible */}
               <div 
                 className="flex items-center justify-between gap-4 cursor-pointer"
                 onClick={() => toggleExpand(testCase.id)}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div 
+                    className="cursor-grab active:cursor-grabbing p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                    title="Drag to reorder"
+                  >
+                    <GripVertical className="w-5 h-5 text-gray-400" />
+                  </div>
                   <button
                     className="p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
                     onClick={(e) => {

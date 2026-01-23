@@ -9,7 +9,8 @@ import {
   updateTestCase,
   deleteTestCase,
   deleteTestSuite,
-  subscribeToTestCasesBySuite 
+  subscribeToTestCasesBySuite,
+  updateTestCaseOrders 
 } from '@/utils/storage'
 import TestCaseForm from './TestCaseForm'
 import TestCaseList from './TestCaseList'
@@ -28,12 +29,16 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
 
   useEffect(() => {
     loadTestCasesBySuite(suite.id).then(data => {
-      setTestCases(data)
+      // Sort by order field
+      const sorted = data.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      setTestCases(sorted)
       setLoading(false)
     })
 
     const unsubscribe = subscribeToTestCasesBySuite(suite.id, (updatedTestCases) => {
-      setTestCases(updatedTestCases)
+      // Sort by order field
+      const sorted = updatedTestCases.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      setTestCases(sorted)
     })
 
     return () => {
@@ -42,10 +47,16 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
   }, [suite.id])
 
   const handleCreateTestCase = async (testCaseData: Omit<TestCase, 'id' | 'projectId' | 'suiteId' | 'createdAt' | 'updatedAt'>) => {
+    // Calculate next order value (append to end)
+    const maxOrder = testCases.length > 0 
+      ? Math.max(...testCases.map(tc => tc.order ?? 0))
+      : -1
+    
     const newTestCase: Omit<TestCase, 'id'> = {
       ...testCaseData,
       projectId: projectId,
       suiteId: suite.id,
+      order: maxOrder + 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -119,6 +130,27 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
   const handleCancelForm = () => {
     setShowForm(false)
     setEditingTestCase(null)
+  }
+
+  const handleReorder = async (reorderedTestCases: TestCase[]) => {
+    // Optimistically update UI
+    setTestCases(reorderedTestCases)
+    
+    // Prepare updates for storage
+    const updates = reorderedTestCases.map(tc => ({
+      id: tc.id,
+      order: tc.order
+    }))
+    
+    try {
+      await updateTestCaseOrders(updates)
+    } catch (error) {
+      console.error('Error updating test case order:', error)
+      alert('Failed to update test case order')
+      // Reload test cases on error
+      const data = await loadTestCasesBySuite(suite.id)
+      setTestCases(data.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
+    }
   }
 
   if (loading) {
@@ -198,6 +230,7 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
           testCases={testCases}
           onEdit={handleEditTestCase}
           onDelete={handleDeleteTestCase}
+          onReorder={handleReorder}
         />
       )}
     </div>

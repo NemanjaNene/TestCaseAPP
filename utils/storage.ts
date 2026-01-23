@@ -1,12 +1,12 @@
 import { User, Project, TestSuite, TestCase } from '@/types'
-import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
   where,
   onSnapshot,
   Unsubscribe
@@ -20,11 +20,11 @@ export const loadUsers = (): User[] => {
   if (typeof window === 'undefined') return []
   const data = localStorage.getItem('qa_users')
   if (!data) {
-    const defaultUsers = [{ 
-      id: '1', 
-      username: 'Comitqa', 
+    const defaultUsers = [{
+      id: '1',
+      username: 'Comitqa',
       password: 'Comitqa123',
-      name: 'Comit Team' 
+      name: 'Comit Team'
     }]
     saveUsers(defaultUsers)
     return defaultUsers
@@ -276,16 +276,52 @@ export const loadTestCasesByProject = async (projectId: string): Promise<TestCas
 export const loadTestCasesBySuite = async (suiteId: string): Promise<TestCase[]> => {
   if (!isFirebaseConfigured() || !db) {
     const allTestCases = await loadTestCases()
-    return allTestCases.filter(tc => tc.suiteId === suiteId)
+    const filtered = allTestCases.filter(tc => tc.suiteId === suiteId)
+
+    // Migration: Add order field if missing
+    const withOrder = filtered.map((tc, index) => ({
+      ...tc,
+      order: tc.order !== undefined ? tc.order : index
+    }))
+
+    // Save migrated data back to storage if any changes were made
+    if (filtered.some(tc => tc.order === undefined)) {
+      const allCases = await loadTestCases()
+      const updated = allCases.map(tc => {
+        const migrated = withOrder.find(w => w.id === tc.id)
+        return migrated || tc
+      })
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('qa_test_cases', JSON.stringify(updated))
+      }
+    }
+
+    return withOrder
   }
 
   try {
     const q = query(collection(db, 'testCases'), where('suiteId', '==', suiteId))
     const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as TestCase))
+    const testCases = querySnapshot.docs.map((doc, index) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        order: data.order !== undefined ? data.order : index
+      } as TestCase
+    })
+
+    // Migration: Update Firebase documents that don't have order field
+    const needsUpdate = querySnapshot.docs.filter(doc => doc.data().order === undefined)
+    if (needsUpdate.length > 0) {
+      await Promise.all(
+        needsUpdate.map((doc, index) =>
+          updateDoc(doc.ref, { order: index })
+        )
+      )
+    }
+
+    return testCases
   } catch (error) {
     console.error('Error loading test cases by suite from Firebase:', error)
     return []
@@ -317,7 +353,7 @@ export const updateTestCase = async (testCaseId: string, data: Partial<TestCase>
   if (!isFirebaseConfigured() || !db) {
     // Fallback to local storage
     const testCases = await loadTestCases()
-    const updated = testCases.map(tc => 
+    const updated = testCases.map(tc =>
       tc.id === testCaseId ? { ...tc, ...data, updatedAt: new Date().toISOString() } : tc
     )
     if (typeof window !== 'undefined') {
@@ -389,5 +425,38 @@ export const subscribeToTestCasesBySuite = (suiteId: string, callback: (testCase
   } catch (error) {
     console.error('Error subscribing to test cases by suite:', error)
     return null
+  }
+}
+
+// Batch update test case orders
+export const updateTestCaseOrders = async (updates: { id: string; order: number }[]): Promise<void> => {
+  if (!isFirebaseConfigured() || !db) {
+    // Fallback to local storage
+    const testCases = await loadTestCases()
+    const updated = testCases.map(tc => {
+      const update = updates.find(u => u.id === tc.id)
+      return update ? { ...tc, order: update.order, updatedAt: new Date().toISOString() } : tc
+    })
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_cases', JSON.stringify(updated))
+    }
+    return
+  }
+
+  try {
+    // Update all test cases in Firebase
+    if (!db) throw new Error('Firestore not initialized')
+
+    await Promise.all(
+      updates.map(({ id, order }) =>
+        updateDoc(doc(db!, 'testCases', id), {
+          order,
+          updatedAt: new Date().toISOString()
+        })
+      )
+    )
+  } catch (error) {
+    console.error('Error updating test case orders in Firebase:', error)
+    throw error
   }
 }

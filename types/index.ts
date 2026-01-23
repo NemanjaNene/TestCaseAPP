@@ -31,6 +31,7 @@ export interface TestCase {
   preconditions: string
   testSteps: string
   expectedResult: string
+  order: number
   createdAt: string
   updatedAt: string
 }
