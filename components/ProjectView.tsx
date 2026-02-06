@@ -20,6 +20,7 @@ import CreateTestRunModal from './CreateTestRunModal'
 import TestRunList from './TestRunList'
 import TestRunExecution from './TestRunExecution'
 import TestRunDashboard from './TestRunDashboard'
+import TestRunReport from './TestRunReport'
 
 interface ProjectViewProps {
   project: Project
@@ -28,6 +29,7 @@ interface ProjectViewProps {
 }
 
 type ViewMode = 'suites' | 'runs'
+type TestRunView = 'execution' | 'report'
 
 export default function ProjectView({ project, onBack, onDelete }: ProjectViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('suites')
@@ -35,6 +37,7 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
   const [testCaseCounts, setTestCaseCounts] = useState<Record<string, number>>({})
   const [selectedSuite, setSelectedSuite] = useState<TestSuite | null>(null)
   const [selectedTestRun, setSelectedTestRun] = useState<TestRun | null>(null)
+  const [testRunView, setTestRunView] = useState<TestRunView>('execution')
   const [showCreateSuiteModal, setShowCreateSuiteModal] = useState(false)
   const [showCreateRunModal, setShowCreateRunModal] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -199,15 +202,30 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
     )
   }
 
-  // If a test run is selected, show the test run execution view
+  // If a test run is selected, show the test run execution or report view
   if (selectedTestRun) {
     return (
       <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
         <div className="max-w-7xl mx-auto">
-          <TestRunExecution
-            testRun={selectedTestRun}
-            onBack={() => setSelectedTestRun(null)}
-          />
+          {testRunView === 'execution' ? (
+            <TestRunExecution
+              testRun={selectedTestRun}
+              onBack={() => {
+                setSelectedTestRun(null)
+                setTestRunView('execution')
+              }}
+              onViewReport={() => setTestRunView('report')}
+            />
+          ) : (
+            <TestRunReport
+              testRun={selectedTestRun}
+              onBack={() => {
+                setSelectedTestRun(null)
+                setTestRunView('execution')
+              }}
+              onContinueExecution={() => setTestRunView('execution')}
+            />
+          )}
         </div>
       </main>
     )

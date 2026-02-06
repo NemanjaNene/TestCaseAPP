@@ -9,9 +9,10 @@ import { getCurrentUser } from '@/utils/storage'
 interface TestRunExecutionProps {
   testRun: TestRun
   onBack: () => void
+  onViewReport?: () => void
 }
 
-export default function TestRunExecution({ testRun, onBack }: TestRunExecutionProps) {
+export default function TestRunExecution({ testRun, onBack, onViewReport }: TestRunExecutionProps) {
   const [testCases, setTestCases] = useState<TestCase[]>([])
   const [results, setResults] = useState<Map<string, TestRunResult>>(new Map())
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -24,15 +25,10 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
 
     // Try to subscribe to real-time updates if Firebase is available
     const unsubscribe = subscribeToTestRunResults(testRun.id, (updatedResults) => {
-      console.log('🔔 Real-time update: Received', updatedResults.length, 'results')
       const resultsMap = new Map<string, TestRunResult>()
       updatedResults.forEach(r => resultsMap.set(r.testCaseId, r))
       setResults(resultsMap)
     })
-
-    if (!unsubscribe) {
-      console.log('⚠️ Real-time subscription not available, using manual refresh')
-    }
 
     return () => {
       if (unsubscribe) unsubscribe()
@@ -82,8 +78,6 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
     const user = getCurrentUser()
     const now = new Date().toISOString()
 
-    console.log('🔵 Marking status:', status, 'for test case:', currentTestCase.id)
-
     try {
       const resultData: any = {
         status,
@@ -101,23 +95,16 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
       
       await upsertTestRunResult(testRun.id, currentTestCase.id, resultData)
 
-      console.log('✅ Result saved successfully')
-
       // Small delay to ensure storage is updated
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Reload results from storage to ensure sync
       const freshResults = await loadTestRunResultsByTestRun(testRun.id)
-      console.log('🔄 Reloaded results:', freshResults.length, 'results')
       
       const resultsMap = new Map<string, TestRunResult>()
-      freshResults.forEach(r => {
-        console.log('📊 Result:', r.testCaseId, '→', r.status)
-        resultsMap.set(r.testCaseId, r)
-      })
+      freshResults.forEach(r => resultsMap.set(r.testCaseId, r))
       
       setResults(resultsMap)
-      console.log('✨ State updated, total results:', resultsMap.size)
 
       // Auto-advance to next test case
       if (currentIndex < testCases.length - 1) {
@@ -168,9 +155,6 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
   }
 
   const progress = stats.total > 0 ? ((stats.total - stats.notRun) / stats.total) * 100 : 0
-
-  // Debug: Log stats when they change
-  console.log('📈 Stats:', stats, 'Progress:', progress.toFixed(1) + '%')
 
   if (loading) {
     return (
@@ -248,7 +232,15 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
                     <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getStatusColor(result?.status)}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{testCase.title}</p>
-                      <p className="text-xs text-gray-400">Test {index + 1} of {testCases.length}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-400">Test {index + 1} of {testCases.length}</p>
+                        {result?.comment && (
+                          <span className="text-xs text-blue-400" title="Has comment">💬</span>
+                        )}
+                        {result?.bugId && (
+                          <span className="text-xs text-red-400" title={`Bug: ${result.bugId}`}>🐛</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -269,12 +261,23 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
             <ArrowLeft className="w-5 h-5" />
             Back
           </button>
-          <button
-            onClick={handleComplete}
-            className="btn-primary"
-          >
-            Complete Test Run
-          </button>
+          <div className="flex gap-3">
+            {onViewReport && (
+              <button
+                onClick={onViewReport}
+                className="btn-secondary flex items-center gap-2"
+              >
+                <FileText className="w-5 h-5" />
+                View Report
+              </button>
+            )}
+            <button
+              onClick={handleComplete}
+              className="btn-primary"
+            >
+              Complete Test Run
+            </button>
+          </div>
         </div>
 
       {/* Test Run Info */}
@@ -368,6 +371,48 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
             </div>
           )}
         </div>
+
+        {/* Previous Execution Result */}
+        {currentResult && (
+          <div className="mb-6 p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+            <p className="text-sm font-semibold text-blue-400 mb-2">📋 Previous Execution:</p>
+            <div className="space-y-1 text-sm">
+              <div>
+                <span className="text-gray-400">Status: </span>
+                <span className={`font-semibold ${
+                  currentResult.status === 'pass' ? 'text-green-400' :
+                  currentResult.status === 'fail' ? 'text-red-400' :
+                  currentResult.status === 'skip' ? 'text-yellow-400' :
+                  currentResult.status === 'blocked' ? 'text-orange-400' :
+                  'text-gray-400'
+                }`}>
+                  {currentResult.status.toUpperCase()}
+                </span>
+              </div>
+              {currentResult.executedBy && (
+                <div>
+                  <span className="text-gray-400">By: </span>
+                  <span className="text-gray-300">{currentResult.executedBy}</span>
+                  <span className="text-gray-500 ml-2">
+                    {currentResult.executedAt && new Date(currentResult.executedAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {currentResult.comment && (
+                <div>
+                  <span className="text-gray-400">Comment: </span>
+                  <span className="text-gray-300">{currentResult.comment}</span>
+                </div>
+              )}
+              {currentResult.bugId && (
+                <div>
+                  <span className="text-gray-400">Bug ID: </span>
+                  <span className="text-red-400 font-mono">{currentResult.bugId}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Status Buttons */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
