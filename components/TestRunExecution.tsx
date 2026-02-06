@@ -194,24 +194,88 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
     )
   }
 
+  const getStatusColor = (status?: TestResultStatus) => {
+    if (!status || status === 'not_run') return 'bg-gray-500'
+    if (status === 'pass') return 'bg-green-500'
+    if (status === 'fail') return 'bg-red-500'
+    if (status === 'skip') return 'bg-yellow-500'
+    if (status === 'blocked') return 'bg-orange-500'
+    return 'bg-gray-500'
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="btn-secondary flex items-center gap-2"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back
-        </button>
-        <button
-          onClick={handleComplete}
-          className="btn-primary"
-        >
-          Complete Test Run
-        </button>
+    <div className="flex gap-6">
+      {/* Sidebar - Test Cases List */}
+      <div className="w-80 flex-shrink-0">
+        <div className="card sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <h3 className="text-lg font-semibold mb-3">Test Cases</h3>
+          
+          {/* Legend */}
+          <div className="grid grid-cols-2 gap-2 mb-4 p-3 bg-gray-800/50 rounded-lg">
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-gray-400">Pass</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-gray-400">Fail</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 rounded-full bg-yellow-500" />
+              <span className="text-gray-400">Skip</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-2 h-2 rounded-full bg-orange-500" />
+              <span className="text-gray-400">Blocked</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {testCases.map((testCase, index) => {
+              const result = results.get(testCase.id)
+              const isActive = index === currentIndex
+              return (
+                <button
+                  key={testCase.id}
+                  onClick={() => setCurrentIndex(index)}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    isActive
+                      ? 'bg-blue-500/20 border-blue-500'
+                      : 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getStatusColor(result?.status)}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{testCase.title}</p>
+                      <p className="text-xs text-gray-400">Test {index + 1} of {testCases.length}</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="flex-1 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
+          </button>
+          <button
+            onClick={handleComplete}
+            className="btn-primary"
+          >
+            Complete Test Run
+          </button>
+        </div>
 
       {/* Test Run Info */}
       <div className="card bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
@@ -384,6 +448,7 @@ export default function TestRunExecution({ testRun, onBack }: TestRunExecutionPr
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
+      </div>
       </div>
     </div>
   )
