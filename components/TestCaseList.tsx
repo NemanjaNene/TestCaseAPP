@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TestCase } from '@/types'
+import { TestCase, TestRunResult, TestResultStatus } from '@/types'
 import { FileText, Edit2, Trash2, Calendar, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
+import { loadTestRunResults } from '@/utils/storage'
 
 interface TestCaseListProps {
   testCases: TestCase[]
@@ -16,6 +17,30 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [localTestCases, setLocalTestCases] = useState<TestCase[]>(testCases)
+  const [testResults, setTestResults] = useState<Map<string, TestRunResult>>(new Map())
+
+  // Load latest test results for all test cases
+  useEffect(() => {
+    const loadResults = async () => {
+      const allResults = await loadTestRunResults()
+      
+      // For each test case, find the most recent result
+      const latestResults = new Map<string, TestRunResult>()
+      testCases.forEach(testCase => {
+        const results = allResults
+          .filter(r => r.testCaseId === testCase.id)
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        
+        if (results.length > 0) {
+          latestResults.set(testCase.id, results[0])
+        }
+      })
+      
+      setTestResults(latestResults)
+    }
+    
+    loadResults()
+  }, [testCases])
 
   // Update local state when props change (from parent or firebase)
   useEffect(() => {
@@ -108,6 +133,24 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
     setDragOverId(null)
   }
 
+  const getStatusColor = (status?: TestResultStatus) => {
+    if (!status || status === 'not_run') return 'bg-gray-500'
+    if (status === 'pass') return 'bg-green-500'
+    if (status === 'fail') return 'bg-red-500'
+    if (status === 'skip') return 'bg-yellow-500'
+    if (status === 'blocked') return 'bg-orange-500'
+    return 'bg-gray-500'
+  }
+
+  const getStatusLabel = (status?: TestResultStatus) => {
+    if (!status || status === 'not_run') return 'Not executed'
+    if (status === 'pass') return 'Passed'
+    if (status === 'fail') return 'Failed'
+    if (status === 'skip') return 'Skipped'
+    if (status === 'blocked') return 'Blocked'
+    return 'Unknown'
+  }
+
   if (localTestCases.length === 0) {
     return (
       <div className="card text-center py-16">
@@ -147,6 +190,7 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
           const isExpanded = expandedIds.has(testCase.id)
           const isDragging = draggedId === testCase.id
           const isDragOver = dragOverId === testCase.id
+          const result = testResults.get(testCase.id)
           
           return (
             <div 
@@ -188,11 +232,32 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
                       <ChevronRight className="w-5 h-5 text-gray-400" />
                     )}
                   </button>
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5" />
+                  <div className="relative flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    {result && (
+                      <div 
+                        className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-900 ${getStatusColor(result.status)}`}
+                        title={getStatusLabel(result.status)}
+                      />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold truncate">{testCase.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold truncate">{testCase.title}</h3>
+                      {result && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          result.status === 'pass' ? 'bg-green-500/20 text-green-400' :
+                          result.status === 'fail' ? 'bg-red-500/20 text-red-400' :
+                          result.status === 'skip' ? 'bg-yellow-500/20 text-yellow-400' :
+                          result.status === 'blocked' ? 'bg-orange-500/20 text-orange-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {getStatusLabel(result.status)}
+                        </span>
+                      )}
+                    </div>
                     {!isExpanded && testCase.description && (
                       <p className="text-sm text-gray-500 truncate">{testCase.description}</p>
                     )}
@@ -245,6 +310,50 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
                     <div>
                       <p className="text-sm font-semibold text-gray-400 mb-1">Expected Result:</p>
                       <p className="text-gray-300 whitespace-pre-wrap">{testCase.expectedResult}</p>
+                    </div>
+                  )}
+
+                  {result && (
+                    <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                      <p className="text-sm font-semibold text-gray-400 mb-2">Last Execution:</p>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">Status:</span>
+                          <span className={`font-semibold ${
+                            result.status === 'pass' ? 'text-green-400' :
+                            result.status === 'fail' ? 'text-red-400' :
+                            result.status === 'skip' ? 'text-yellow-400' :
+                            result.status === 'blocked' ? 'text-orange-400' :
+                            'text-gray-400'
+                          }`}>
+                            {getStatusLabel(result.status)}
+                          </span>
+                        </div>
+                        {result.executedBy && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400">Executed by:</span>
+                            <span className="text-gray-300">{result.executedBy}</span>
+                          </div>
+                        )}
+                        {result.executedAt && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400">Executed at:</span>
+                            <span className="text-gray-300">{new Date(result.executedAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {result.comment && (
+                          <div>
+                            <span className="text-gray-400">Comment:</span>
+                            <p className="text-gray-300 mt-1 whitespace-pre-wrap">{result.comment}</p>
+                          </div>
+                        )}
+                        {result.bugId && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400">Bug ID:</span>
+                            <span className="text-red-400 font-mono">{result.bugId}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
