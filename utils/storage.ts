@@ -1,4 +1,4 @@
-import { User, Project, TestSuite, TestCase } from '@/types'
+import { User, Project, TestSuite, TestCase, TestRun, TestRunResult } from '@/types'
 import {
   collection,
   getDocs,
@@ -458,5 +458,305 @@ export const updateTestCaseOrders = async (updates: { id: string; order: number 
   } catch (error) {
     console.error('Error updating test case orders in Firebase:', error)
     throw error
+  }
+}
+
+// ============================================
+// TEST RUNS (Firebase or Local Storage)
+// ============================================
+export const loadTestRuns = async (): Promise<TestRun[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    if (typeof window === 'undefined') return []
+    const data = localStorage.getItem('qa_test_runs')
+    return data ? JSON.parse(data) : []
+  }
+
+  try {
+    const querySnapshot = await getDocs(collection(db, 'testRuns'))
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestRun))
+  } catch (error) {
+    console.error('Error loading test runs from Firebase:', error)
+    return []
+  }
+}
+
+export const loadTestRunsByProject = async (projectId: string): Promise<TestRun[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    const allTestRuns = await loadTestRuns()
+    return allTestRuns.filter(tr => tr.projectId === projectId)
+  }
+
+  try {
+    const q = query(collection(db, 'testRuns'), where('projectId', '==', projectId))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestRun))
+  } catch (error) {
+    console.error('Error loading test runs by project from Firebase:', error)
+    return []
+  }
+}
+
+export const saveTestRun = async (testRun: Omit<TestRun, 'id'>): Promise<string> => {
+  if (!isFirebaseConfigured() || !db) {
+    const newTestRun = { ...testRun, id: Date.now().toString() }
+    const testRuns = await loadTestRuns()
+    const updated = [...testRuns, newTestRun]
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_runs', JSON.stringify(updated))
+    }
+    return newTestRun.id
+  }
+
+  try {
+    const docRef = await addDoc(collection(db, 'testRuns'), testRun)
+    return docRef.id
+  } catch (error) {
+    console.error('Error saving test run to Firebase:', error)
+    throw error
+  }
+}
+
+export const updateTestRun = async (testRunId: string, data: Partial<TestRun>): Promise<void> => {
+  if (!isFirebaseConfigured() || !db) {
+    const testRuns = await loadTestRuns()
+    const updated = testRuns.map(tr =>
+      tr.id === testRunId ? { ...tr, ...data, updatedAt: new Date().toISOString() } : tr
+    )
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_runs', JSON.stringify(updated))
+    }
+    return
+  }
+
+  try {
+    await updateDoc(doc(db!, 'testRuns', testRunId), {
+      ...data,
+      updatedAt: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('Error updating test run in Firebase:', error)
+    throw error
+  }
+}
+
+export const deleteTestRun = async (testRunId: string): Promise<void> => {
+  if (!isFirebaseConfigured() || !db) {
+    const testRuns = await loadTestRuns()
+    const updated = testRuns.filter(tr => tr.id !== testRunId)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_runs', JSON.stringify(updated))
+    }
+    return
+  }
+
+  try {
+    await deleteDoc(doc(db, 'testRuns', testRunId))
+  } catch (error) {
+    console.error('Error deleting test run from Firebase:', error)
+    throw error
+  }
+}
+
+export const subscribeToTestRuns = (projectId: string, callback: (testRuns: TestRun[]) => void): Unsubscribe | null => {
+  if (!isFirebaseConfigured() || !db) return null
+
+  try {
+    const q = query(collection(db, 'testRuns'), where('projectId', '==', projectId))
+    return onSnapshot(q, (snapshot) => {
+      const testRuns = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as TestRun))
+      callback(testRuns)
+    })
+  } catch (error) {
+    console.error('Error subscribing to test runs:', error)
+    return null
+  }
+}
+
+// ============================================
+// TEST RUN RESULTS (Firebase or Local Storage)
+// ============================================
+export const loadTestRunResults = async (): Promise<TestRunResult[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    if (typeof window === 'undefined') return []
+    const data = localStorage.getItem('qa_test_run_results')
+    return data ? JSON.parse(data) : []
+  }
+
+  try {
+    const querySnapshot = await getDocs(collection(db, 'testRunResults'))
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestRunResult))
+  } catch (error) {
+    console.error('Error loading test run results from Firebase:', error)
+    return []
+  }
+}
+
+export const loadTestRunResultsByTestRun = async (testRunId: string): Promise<TestRunResult[]> => {
+  if (!isFirebaseConfigured() || !db) {
+    const allResults = await loadTestRunResults()
+    return allResults.filter(r => r.testRunId === testRunId)
+  }
+
+  try {
+    const q = query(collection(db, 'testRunResults'), where('testRunId', '==', testRunId))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TestRunResult))
+  } catch (error: any) {
+    console.error('❌ Error loading test run results from Firebase:', error)
+    console.error('Error code:', error?.code)
+    console.warn('⚠️ Falling back to localStorage for loading')
+    
+    // Fallback to localStorage if Firebase fails
+    const allResults = await loadTestRunResults()
+    return allResults.filter(r => r.testRunId === testRunId)
+  }
+}
+
+export const saveTestRunResult = async (result: Omit<TestRunResult, 'id'>): Promise<string> => {
+  if (!isFirebaseConfigured() || !db) {
+    const newResult = { ...result, id: Date.now().toString() }
+    const results = await loadTestRunResults()
+    const updated = [...results, newResult]
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_run_results', JSON.stringify(updated))
+    }
+    return newResult.id
+  }
+
+  try {
+    // Remove undefined fields for Firebase
+    const cleanResult: any = {}
+    Object.keys(result).forEach(key => {
+      const value = (result as any)[key]
+      if (value !== undefined) {
+        cleanResult[key] = value
+      }
+    })
+    
+    console.log('🔥 Attempting to save to Firebase:', cleanResult)
+    const docRef = await addDoc(collection(db, 'testRunResults'), cleanResult)
+    console.log('✅ Saved to Firebase with ID:', docRef.id)
+    return docRef.id
+  } catch (error: any) {
+    console.error('❌ Error saving test run result to Firebase:', error)
+    console.error('Error code:', error?.code)
+    console.error('Error message:', error?.message)
+    
+    // Fallback to localStorage if Firebase fails
+    console.warn('⚠️ Falling back to localStorage')
+    const newResult = { ...result, id: Date.now().toString() }
+    const results = await loadTestRunResults()
+    const updated = [...results, newResult]
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_run_results', JSON.stringify(updated))
+    }
+    return newResult.id
+  }
+}
+
+export const updateTestRunResult = async (resultId: string, data: Partial<TestRunResult>): Promise<void> => {
+  if (!isFirebaseConfigured() || !db) {
+    const results = await loadTestRunResults()
+    const updated = results.map(r =>
+      r.id === resultId ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+    )
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_run_results', JSON.stringify(updated))
+    }
+    return
+  }
+
+  try {
+    // Remove undefined fields for Firebase
+    const cleanData: any = { updatedAt: new Date().toISOString() }
+    Object.keys(data).forEach(key => {
+      const value = (data as any)[key]
+      if (value !== undefined) {
+        cleanData[key] = value
+      }
+    })
+    
+    console.log('🔥 Attempting to update Firebase document:', resultId, cleanData)
+    await updateDoc(doc(db!, 'testRunResults', resultId), cleanData)
+    console.log('✅ Firebase document updated')
+  } catch (error: any) {
+    console.error('❌ Error updating test run result in Firebase:', error)
+    console.error('Error code:', error?.code)
+    console.error('Error message:', error?.message)
+    
+    // Fallback to localStorage if Firebase fails
+    console.warn('⚠️ Falling back to localStorage for update')
+    const results = await loadTestRunResults()
+    const updated = results.map(r =>
+      r.id === resultId ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+    )
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('qa_test_run_results', JSON.stringify(updated))
+    }
+  }
+}
+
+export const upsertTestRunResult = async (testRunId: string, testCaseId: string, data: Partial<TestRunResult>): Promise<void> => {
+  console.log('💾 upsertTestRunResult called:', { testRunId, testCaseId, status: data.status })
+  
+  // Check if result already exists
+  const results = await loadTestRunResultsByTestRun(testRunId)
+  const existing = results.find(r => r.testCaseId === testCaseId)
+
+  if (existing) {
+    console.log('📝 Updating existing result:', existing.id)
+    await updateTestRunResult(existing.id, data)
+  } else {
+    console.log('➕ Creating new result')
+    const newResult: any = {
+      testRunId,
+      testCaseId,
+      status: data.status || 'not_run',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    
+    // Only add optional fields if they have values
+    if (data.comment) newResult.comment = data.comment
+    if (data.bugId) newResult.bugId = data.bugId
+    if (data.executedAt) newResult.executedAt = data.executedAt
+    if (data.executedBy) newResult.executedBy = data.executedBy
+    
+    await saveTestRunResult(newResult)
+  }
+  
+  console.log('✅ upsertTestRunResult completed')
+}
+
+export const subscribeToTestRunResults = (testRunId: string, callback: (results: TestRunResult[]) => void): Unsubscribe | null => {
+  if (!isFirebaseConfigured() || !db) return null
+
+  try {
+    const q = query(collection(db, 'testRunResults'), where('testRunId', '==', testRunId))
+    return onSnapshot(q, (snapshot) => {
+      const results = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as TestRunResult))
+      callback(results)
+    })
+  } catch (error) {
+    console.error('Error subscribing to test run results:', error)
+    return null
   }
 }

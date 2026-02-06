@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Project, TestSuite, TestCase } from '@/types'
-import { ArrowLeft, Plus, Layers, Trash2, FileText } from 'lucide-react'
+import { Project, TestSuite, TestCase, TestRun } from '@/types'
+import { ArrowLeft, Plus, Layers, Trash2, FileText, PlayCircle } from 'lucide-react'
 import { 
   loadTestSuitesByProject,
   saveTestSuite,
@@ -10,10 +10,16 @@ import {
   subscribeToTestSuites,
   loadTestCasesByProject,
   deleteTestCase,
-  subscribeToTestCases
+  subscribeToTestCases,
+  saveTestRun,
+  getCurrentUser
 } from '@/utils/storage'
 import CreateTestSuiteModal from './CreateTestSuiteModal'
 import TestSuiteView from './TestSuiteView'
+import CreateTestRunModal from './CreateTestRunModal'
+import TestRunList from './TestRunList'
+import TestRunExecution from './TestRunExecution'
+import TestRunDashboard from './TestRunDashboard'
 
 interface ProjectViewProps {
   project: Project
@@ -21,11 +27,16 @@ interface ProjectViewProps {
   onDelete: (projectId: string) => void
 }
 
+type ViewMode = 'suites' | 'runs'
+
 export default function ProjectView({ project, onBack, onDelete }: ProjectViewProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('suites')
   const [testSuites, setTestSuites] = useState<TestSuite[]>([])
   const [testCaseCounts, setTestCaseCounts] = useState<Record<string, number>>({})
   const [selectedSuite, setSelectedSuite] = useState<TestSuite | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedTestRun, setSelectedTestRun] = useState<TestRun | null>(null)
+  const [showCreateSuiteModal, setShowCreateSuiteModal] = useState(false)
+  const [showCreateRunModal, setShowCreateRunModal] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const refreshTestCaseCounts = async () => {
@@ -92,10 +103,35 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
       if (!subscribeToTestSuites(project.id, () => {})) {
         setTestSuites([...testSuites, { ...newSuite, id: suiteId }])
       }
-      setShowCreateModal(false)
+      setShowCreateSuiteModal(false)
     } catch (error) {
       console.error('Error creating test suite:', error)
       alert('Failed to create test suite')
+    }
+  }
+
+  const handleCreateTestRun = async (name: string, description: string, suiteIds: string[]) => {
+    const user = getCurrentUser()
+    const newTestRun: Omit<TestRun, 'id'> = {
+      name,
+      description,
+      projectId: project.id,
+      suiteIds,
+      createdBy: user?.username || 'unknown',
+      startedAt: new Date().toISOString(),
+      status: 'in_progress',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    
+    try {
+      const testRunId = await saveTestRun(newTestRun)
+      setShowCreateRunModal(false)
+      // Open the test run for execution
+      setSelectedTestRun({ ...newTestRun, id: testRunId })
+    } catch (error) {
+      console.error('Error creating test run:', error)
+      alert('Failed to create test run')
     }
   }
 
@@ -163,6 +199,20 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
     )
   }
 
+  // If a test run is selected, show the test run execution view
+  if (selectedTestRun) {
+    return (
+      <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <div className="max-w-7xl mx-auto">
+          <TestRunExecution
+            testRun={selectedTestRun}
+            onBack={() => setSelectedTestRun(null)}
+          />
+        </div>
+      </main>
+    )
+  }
+
   // Calculate total test cases
   const totalTestCases = Object.values(testCaseCounts).reduce((a, b) => a + b, 0)
 
@@ -189,13 +239,23 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
             </div>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              New Test Suite
-            </button>
+            {viewMode === 'suites' ? (
+              <button
+                onClick={() => setShowCreateSuiteModal(true)}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                New Test Suite
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowCreateRunModal(true)}
+                className="btn-primary flex items-center gap-2"
+              >
+                <PlayCircle className="w-5 h-5" />
+                New Test Run
+              </button>
+            )}
             <button
               onClick={handleDeleteProject}
               className="btn-danger flex items-center gap-2"
@@ -206,30 +266,59 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="card bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
-            <div className="flex items-center gap-3 mb-2">
-              <Layers className="w-8 h-8 text-purple-400" />
-              <div>
-                <p className="text-gray-400 text-sm">Test Suites</p>
-                <p className="text-3xl font-bold">{testSuites.length}</p>
-              </div>
-            </div>
-          </div>
-          <div className="card bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-            <div className="flex items-center gap-3 mb-2">
-              <FileText className="w-8 h-8 text-blue-400" />
-              <div>
-                <p className="text-gray-400 text-sm">Total Test Cases</p>
-                <p className="text-3xl font-bold">{totalTestCases}</p>
-              </div>
-            </div>
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-8">
+          <button
+            onClick={() => setViewMode('suites')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+              viewMode === 'suites'
+                ? 'bg-purple-500/20 border-2 border-purple-500 text-purple-400'
+                : 'bg-gray-800/50 border-2 border-gray-700/50 text-gray-400 hover:border-gray-600/50'
+            }`}
+          >
+            <Layers className="w-5 h-5" />
+            Test Suites
+          </button>
+          <button
+            onClick={() => setViewMode('runs')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+              viewMode === 'runs'
+                ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
+                : 'bg-gray-800/50 border-2 border-gray-700/50 text-gray-400 hover:border-gray-600/50'
+            }`}
+          >
+            <PlayCircle className="w-5 h-5" />
+            Test Runs
+          </button>
         </div>
 
-        {/* Test Suites */}
-        <div>
+        {/* Content Based on View Mode */}
+        {viewMode === 'suites' ? (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="card bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+                <div className="flex items-center gap-3 mb-2">
+                  <Layers className="w-8 h-8 text-purple-400" />
+                  <div>
+                    <p className="text-gray-400 text-sm">Test Suites</p>
+                    <p className="text-3xl font-bold">{testSuites.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
+                <div className="flex items-center gap-3 mb-2">
+                  <FileText className="w-8 h-8 text-blue-400" />
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Test Cases</p>
+                    <p className="text-3xl font-bold">{totalTestCases}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Test Suites */}
+            <div>
           <div className="flex items-center gap-3 mb-6">
             <Layers className="w-6 h-6 text-purple-400" />
             <h2 className="text-3xl font-bold">Test Suites</h2>
@@ -241,7 +330,7 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
               <h3 className="text-2xl font-semibold mb-2 text-gray-400">No test suites yet</h3>
               <p className="text-gray-500 mb-6">Create your first test suite to organize your test cases</p>
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => setShowCreateSuiteModal(true)}
                 className="btn-primary inline-flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" />
@@ -284,13 +373,57 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
               ))}
             </div>
           )}
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Test Run Dashboard (Green Area Stats) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              <div className="lg:col-span-2">
+                <TestRunDashboard projectId={project.id} testSuites={testSuites} />
+              </div>
+              <div className="card bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
+                <div className="flex items-center gap-3 mb-2">
+                  <FileText className="w-8 h-8 text-blue-400" />
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Test Cases</p>
+                    <p className="text-3xl font-bold">{totalTestCases}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Test Runs List */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <PlayCircle className="w-6 h-6 text-green-400" />
+                <h2 className="text-3xl font-bold">Test Runs</h2>
+              </div>
+
+              <TestRunList
+                projectId={project.id}
+                onSelectTestRun={setSelectedTestRun}
+                onCreateNew={() => setShowCreateRunModal(true)}
+              />
+            </div>
+          </>
+        )}
 
         {/* Create Suite Modal */}
-        {showCreateModal && (
+        {showCreateSuiteModal && (
           <CreateTestSuiteModal
-            onClose={() => setShowCreateModal(false)}
+            onClose={() => setShowCreateSuiteModal(false)}
             onCreate={handleCreateSuite}
+          />
+        )}
+
+        {/* Create Test Run Modal */}
+        {showCreateRunModal && (
+          <CreateTestRunModal
+            projectId={project.id}
+            suites={testSuites}
+            onClose={() => setShowCreateRunModal(false)}
+            onCreate={handleCreateTestRun}
           />
         )}
       </div>

@@ -36,9 +36,41 @@ export interface TestCase {
   updatedAt: string
 }
 
+export type TestRunStatus = 'in_progress' | 'completed'
+export type TestResultStatus = 'pass' | 'fail' | 'skip' | 'blocked' | 'not_run'
+
+export interface TestRun {
+  id: string
+  name: string
+  description: string
+  projectId: string
+  suiteIds: string[]
+  createdBy: string
+  startedAt: string
+  completedAt?: string
+  status: TestRunStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TestRunResult {
+  id: string
+  testRunId: string
+  testCaseId: string
+  status: TestResultStatus
+  comment?: string
+  bugId?: string
+  executedAt?: string
+  executedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AppState {
   currentUser: User | null
   projects: Project[]
   testSuites: TestSuite[]
   testCases: TestCase[]
+  testRuns: TestRun[]
+  testRunResults: TestRunResult[]
 }
