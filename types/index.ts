@@ -1,8 +1,12 @@
+export type UserRole = 'admin' | 'global_viewer' | 'project_viewer'
+
 export interface User {
   id: string
   username: string
   password: string
   name: string
+  role: UserRole
+  projectAccess?: string[] // For project_viewer role - array of project IDs or names
 }
 
 export interface Project {

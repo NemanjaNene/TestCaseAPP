@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { User, Project } from '@/types'
 import { LogOut, Plus, FolderOpen, User as UserIcon } from 'lucide-react'
-import { loadProjects, saveProject, deleteProject, subscribeToProjects } from '@/utils/storage'
+import { loadProjects, saveProject, deleteProject, subscribeToProjects, canViewProject, canEditProject } from '@/utils/storage'
 import ProjectView from './ProjectView'
 import CreateProjectModal from './CreateProjectModal'
 
@@ -21,19 +21,23 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   useEffect(() => {
     // Load initial projects
     loadProjects().then(data => {
-      setProjects(data)
+      // Filter projects based on user access
+      const filteredProjects = data.filter(project => canViewProject(user, project.name))
+      setProjects(filteredProjects)
       setLoading(false)
     })
 
     // Subscribe to real-time updates
     const unsubscribe = subscribeToProjects((updatedProjects) => {
-      setProjects(updatedProjects)
+      // Filter projects based on user access
+      const filteredProjects = updatedProjects.filter(project => canViewProject(user, project.name))
+      setProjects(filteredProjects)
     })
 
     return () => {
       if (unsubscribe) unsubscribe()
     }
-  }, [])
+  }, [user])
 
   const handleCreateProject = async (name: string, description: string) => {
     const newProject: Omit<Project, 'id'> = {
@@ -88,6 +92,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     return (
       <ProjectView
         project={selectedProject}
+        user={user}
         onBack={handleBackToProjects}
         onDelete={handleDeleteProject}
       />
@@ -108,13 +113,15 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             </p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              New Project
-            </button>
+            {canEditProject(user) && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                New Project
+              </button>
+            )}
             <button
               onClick={onLogout}
               className="btn-secondary flex items-center gap-2"
@@ -131,8 +138,19 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
               <UserIcon className="w-8 h-8" />
             </div>
-            <div>
-              <h2 className="text-2xl font-bold">{user.name}</h2>
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold">{user.name}</h2>
+                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                  user.role === 'admin' 
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/50' 
+                    : user.role === 'global_viewer'
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                }`}>
+                  {user.role === 'admin' ? 'QA Team' : user.role === 'global_viewer' ? 'Global Viewer' : 'Project Viewer'}
+                </span>
+              </div>
               <p className="text-gray-400">@{user.username}</p>
             </div>
           </div>
@@ -149,15 +167,23 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           {projects.length === 0 ? (
             <div className="card text-center py-16">
               <FolderOpen className="w-20 h-20 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-2xl font-semibold mb-2 text-gray-400">No projects yet</h3>
-              <p className="text-gray-500 mb-6">Create your first project to start managing test cases</p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="btn-primary inline-flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Create First Project
-              </button>
+              <h3 className="text-2xl font-semibold mb-2 text-gray-400">
+                {canEditProject(user) ? 'No projects yet' : 'No projects available'}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {canEditProject(user) 
+                  ? 'Create your first project to start managing test cases'
+                  : 'You do not have access to any projects at this time'}
+              </p>
+              {canEditProject(user) && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Create First Project
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Project, TestSuite, TestCase, TestRun } from '@/types'
+import { Project, TestSuite, TestCase, TestRun, User } from '@/types'
 import { ArrowLeft, Plus, Layers, Trash2, FileText, PlayCircle } from 'lucide-react'
 import { 
   loadTestSuitesByProject,
@@ -12,7 +12,8 @@ import {
   deleteTestCase,
   subscribeToTestCases,
   saveTestRun,
-  getCurrentUser
+  getCurrentUser,
+  canEditProject
 } from '@/utils/storage'
 import CreateTestSuiteModal from './CreateTestSuiteModal'
 import TestSuiteView from './TestSuiteView'
@@ -24,6 +25,7 @@ import TestRunReport from './TestRunReport'
 
 interface ProjectViewProps {
   project: Project
+  user: User
   onBack: () => void
   onDelete: (projectId: string) => void
 }
@@ -31,7 +33,7 @@ interface ProjectViewProps {
 type ViewMode = 'suites' | 'runs'
 type TestRunView = 'execution' | 'report'
 
-export default function ProjectView({ project, onBack, onDelete }: ProjectViewProps) {
+export default function ProjectView({ project, user, onBack, onDelete }: ProjectViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('suites')
   const [testSuites, setTestSuites] = useState<TestSuite[]>([])
   const [testCaseCounts, setTestCaseCounts] = useState<Record<string, number>>({})
@@ -195,6 +197,7 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
           <TestSuiteView
             suite={selectedSuite}
             projectId={project.id}
+            user={user}
             onBack={() => setSelectedSuite(null)}
           />
         </div>
@@ -257,30 +260,34 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
             </div>
           </div>
           <div className="flex gap-3">
-            {viewMode === 'suites' ? (
-              <button
-                onClick={() => setShowCreateSuiteModal(true)}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                New Test Suite
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowCreateRunModal(true)}
-                className="btn-primary flex items-center gap-2"
-              >
-                <PlayCircle className="w-5 h-5" />
-                New Test Run
-              </button>
+            {canEditProject(user) && (
+              <>
+                {viewMode === 'suites' ? (
+                  <button
+                    onClick={() => setShowCreateSuiteModal(true)}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    New Test Suite
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowCreateRunModal(true)}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <PlayCircle className="w-5 h-5" />
+                    New Test Run
+                  </button>
+                )}
+                <button
+                  onClick={handleDeleteProject}
+                  className="btn-danger flex items-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Delete Project
+                </button>
+              </>
             )}
-            <button
-              onClick={handleDeleteProject}
-              className="btn-danger flex items-center gap-2"
-            >
-              <Trash2 className="w-5 h-5" />
-              Delete Project
-            </button>
           </div>
         </div>
 
@@ -345,15 +352,23 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
           {testSuites.length === 0 ? (
             <div className="card text-center py-16">
               <Layers className="w-20 h-20 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-2xl font-semibold mb-2 text-gray-400">No test suites yet</h3>
-              <p className="text-gray-500 mb-6">Create your first test suite to organize your test cases</p>
-              <button
-                onClick={() => setShowCreateSuiteModal(true)}
-                className="btn-primary inline-flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Create First Suite
-              </button>
+              <h3 className="text-2xl font-semibold mb-2 text-gray-400">
+                {canEditProject(user) ? 'No test suites yet' : 'No test suites available'}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {canEditProject(user) 
+                  ? 'Create your first test suite to organize your test cases'
+                  : 'This project does not have any test suites yet'}
+              </p>
+              {canEditProject(user) && (
+                <button
+                  onClick={() => setShowCreateSuiteModal(true)}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Create First Suite
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -363,13 +378,15 @@ export default function ProjectView({ project, onBack, onDelete }: ProjectViewPr
                   onClick={() => setSelectedSuite(suite)}
                   className="card cursor-pointer hover:border-purple-500/50 group relative"
                 >
-                  <button
-                    onClick={(e) => handleDeleteSuite(suite.id, e)}
-                    className="absolute top-4 right-4 p-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete Suite"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canEditProject(user) && (
+                    <button
+                      onClick={(e) => handleDeleteSuite(suite.id, e)}
+                      className="absolute top-4 right-4 p-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete Suite"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                   <div className="flex items-start gap-3 mb-4">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                       <Layers className="w-6 h-6" />

@@ -20,12 +20,78 @@ export const loadUsers = (): User[] => {
   if (typeof window === 'undefined') return []
   const data = localStorage.getItem('qa_users')
   if (!data) {
-    const defaultUsers = [{
-      id: '1',
-      username: 'Comitqa',
-      password: 'Comitqa123',
-      name: 'Comit Team'
-    }]
+    const defaultUsers = [
+      // QA Team (Admin) - Shared password
+      {
+        id: '1',
+        username: 'NemanjaN',
+        password: 'Comitqa123',
+        name: 'Nemanja Nikitovic',
+        role: 'admin' as const
+      },
+      {
+        id: '2',
+        username: 'NemanjaP',
+        password: 'Comitqa123',
+        name: 'Nemanja Petrovic',
+        role: 'admin' as const
+      },
+      {
+        id: '3',
+        username: 'Milan',
+        password: 'Comitqa123',
+        name: 'Milan',
+        role: 'admin' as const
+      },
+      {
+        id: '4',
+        username: 'Vlada',
+        password: 'Comitqa123',
+        name: 'Vlada',
+        role: 'admin' as const
+      },
+      // Legacy admin account (keep for compatibility)
+      {
+        id: '5',
+        username: 'Comitqa',
+        password: 'Comitqa123',
+        name: 'Comit Team',
+        role: 'admin' as const
+      },
+      // Global Viewer (PM/Owner)
+      {
+        id: '6',
+        username: 'GlobalView',
+        password: 'ViewAll2026',
+        name: 'Global Viewer',
+        role: 'global_viewer' as const
+      },
+      // Per-Project Viewers
+      {
+        id: '7',
+        username: 'FairPlayView',
+        password: 'FairPlay2026',
+        name: 'FairPlay Viewer',
+        role: 'project_viewer' as const,
+        projectAccess: ['FairPlay']
+      },
+      {
+        id: '8',
+        username: 'RazView',
+        password: 'Raz2026',
+        name: 'Raz Viewer',
+        role: 'project_viewer' as const,
+        projectAccess: ['Raz']
+      },
+      {
+        id: '9',
+        username: 'VitalsView',
+        password: 'Vitals2026',
+        name: 'Vitals Viewer',
+        role: 'project_viewer' as const,
+        projectAccess: ['Vitals 4 Pets', 'Vitals']
+      }
+    ]
     saveUsers(defaultUsers)
     return defaultUsers
   }
@@ -51,6 +117,24 @@ export const setCurrentUser = (user: User | null): void => {
   } else {
     localStorage.removeItem('qa_current_user')
   }
+}
+
+// Permission helpers
+export const isAdmin = (user: User | null): boolean => {
+  return user?.role === 'admin'
+}
+
+export const canViewProject = (user: User | null, projectName: string): boolean => {
+  if (!user) return false
+  if (user.role === 'admin' || user.role === 'global_viewer') return true
+  if (user.role === 'project_viewer') {
+    return user.projectAccess?.some(p => projectName.includes(p) || p.includes(projectName)) || false
+  }
+  return false
+}
+
+export const canEditProject = (user: User | null): boolean => {
+  return user?.role === 'admin'
 }
 
 // ============================================

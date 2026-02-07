@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TestSuite, TestCase } from '@/types'
+import { TestSuite, TestCase, User } from '@/types'
 import { ArrowLeft, Plus, FileText, Trash2, Layers } from 'lucide-react'
 import { 
   loadTestCasesBySuite, 
@@ -10,7 +10,8 @@ import {
   deleteTestCase,
   deleteTestSuite,
   subscribeToTestCasesBySuite,
-  updateTestCaseOrders 
+  updateTestCaseOrders,
+  canEditProject
 } from '@/utils/storage'
 import TestCaseForm from './TestCaseForm'
 import TestCaseList from './TestCaseList'
@@ -18,10 +19,11 @@ import TestCaseList from './TestCaseList'
 interface TestSuiteViewProps {
   suite: TestSuite
   projectId: string
+  user: User
   onBack: () => void
 }
 
-export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteViewProps) {
+export default function TestSuiteView({ suite, projectId, user, onBack }: TestSuiteViewProps) {
   const [testCases, setTestCases] = useState<TestCase[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null)
@@ -187,22 +189,24 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
             </div>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            New Test Case
-          </button>
-          <button
-            onClick={handleDeleteSuite}
-            className="btn-danger flex items-center gap-2"
-          >
-            <Trash2 className="w-5 h-5" />
-            Delete Suite
-          </button>
-        </div>
+        {canEditProject(user) && (
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowForm(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              New Test Case
+            </button>
+            <button
+              onClick={handleDeleteSuite}
+              className="btn-danger flex items-center gap-2"
+            >
+              <Trash2 className="w-5 h-5" />
+              Delete Suite
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -228,6 +232,7 @@ export default function TestSuiteView({ suite, projectId, onBack }: TestSuiteVie
       ) : (
         <TestCaseList
           testCases={testCases}
+          user={user}
           onEdit={handleEditTestCase}
           onDelete={handleDeleteTestCase}
           onReorder={handleReorder}

@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TestCase, TestRunResult, TestResultStatus } from '@/types'
+import { TestCase, TestRunResult, TestResultStatus, User } from '@/types'
 import { FileText, Edit2, Trash2, Calendar, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
-import { loadTestRunResults } from '@/utils/storage'
+import { loadTestRunResults, canEditProject } from '@/utils/storage'
 
 interface TestCaseListProps {
   testCases: TestCase[]
+  user: User
   onEdit: (testCase: TestCase) => void
   onDelete: (testCaseId: string) => void
   onReorder: (reorderedTestCases: TestCase[]) => void
 }
 
-export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }: TestCaseListProps) {
+export default function TestCaseList({ testCases, user, onEdit, onDelete, onReorder }: TestCaseListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -200,12 +201,12 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
               } ${
                 isDragOver ? 'border-blue-500 scale-105' : ''
               }`}
-              draggable
-              onDragStart={(e) => handleDragStart(e, testCase.id)}
-              onDragOver={(e) => handleDragOver(e, testCase.id)}
-              onDragEnter={(e) => handleDragEnter(e, testCase.id)}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
+              draggable={canEditProject(user)}
+              onDragStart={canEditProject(user) ? (e) => handleDragStart(e, testCase.id) : undefined}
+              onDragOver={canEditProject(user) ? (e) => handleDragOver(e, testCase.id) : undefined}
+              onDragEnter={canEditProject(user) ? (e) => handleDragEnter(e, testCase.id) : undefined}
+              onDrop={canEditProject(user) ? handleDrop : undefined}
+              onDragEnd={canEditProject(user) ? handleDragEnd : undefined}
             >
               {/* Header - Always visible */}
               <div 
@@ -213,12 +214,14 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
                 onClick={() => toggleExpand(testCase.id)}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div 
-                    className="cursor-grab active:cursor-grabbing p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0"
-                    title="Drag to reorder"
-                  >
-                    <GripVertical className="w-5 h-5 text-gray-400" />
-                  </div>
+                  {canEditProject(user) && (
+                    <div 
+                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                      title="Drag to reorder"
+                    >
+                      <GripVertical className="w-5 h-5 text-gray-400" />
+                    </div>
+                  )}
                   <button
                     className="p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
                     onClick={(e) => {
@@ -264,22 +267,24 @@ export default function TestCaseList({ testCases, onEdit, onDelete, onReorder }:
                   </div>
                 </div>
 
-                <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => onEdit(testCase)}
-                    className="p-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 hover:border-blue-500/50 transition-all"
-                    title="Edit"
-                  >
-                    <Edit2 className="w-4 h-4 text-blue-400" />
-                  </button>
-                  <button
-                    onClick={() => onDelete(testCase.id)}
-                    className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 hover:border-red-500/50 transition-all"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                  </button>
-                </div>
+                {canEditProject(user) && (
+                  <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => onEdit(testCase)}
+                      className="p-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 hover:border-blue-500/50 transition-all"
+                      title="Edit"
+                    >
+                      <Edit2 className="w-4 h-4 text-blue-400" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(testCase.id)}
+                      className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 hover:border-red-500/50 transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-400" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Expanded Content */}
