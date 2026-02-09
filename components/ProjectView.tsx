@@ -205,8 +205,8 @@ export default function ProjectView({ project, user, onBack, onDelete }: Project
     )
   }
 
-  // If a test run is selected, show the test run execution or report view
-  if (selectedTestRun) {
+  // If a test run is selected, show the test run execution or report view (only for QA Team)
+  if (selectedTestRun && user.role === 'admin') {
     return (
       <main className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
         <div className="max-w-7xl mx-auto">
@@ -304,21 +304,23 @@ export default function ProjectView({ project, user, onBack, onDelete }: Project
             <Layers className="w-5 h-5" />
             Test Suites
           </button>
-          <button
-            onClick={() => setViewMode('runs')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-              viewMode === 'runs'
-                ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
-                : 'bg-gray-800/50 border-2 border-gray-700/50 text-gray-400 hover:border-gray-600/50'
-            }`}
-          >
-            <PlayCircle className="w-5 h-5" />
-            Test Runs
-          </button>
+          {user.role === 'admin' && (
+            <button
+              onClick={() => setViewMode('runs')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+                viewMode === 'runs'
+                  ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
+                  : 'bg-gray-800/50 border-2 border-gray-700/50 text-gray-400 hover:border-gray-600/50'
+              }`}
+            >
+              <PlayCircle className="w-5 h-5" />
+              Test Runs
+            </button>
+          )}
         </div>
 
         {/* Content Based on View Mode */}
-        {viewMode === 'suites' ? (
+        {viewMode === 'suites' || user.role !== 'admin' ? (
           <>
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
