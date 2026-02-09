@@ -33,21 +33,21 @@ export const loadUsers = (): User[] => {
         id: '2',
         username: 'NemanjaP',
         password: 'Comitqa123',
-        name: 'Nemanja Petrovic',
+        name: 'Nemanja Pavlovic',
         role: 'admin' as const
       },
       {
         id: '3',
         username: 'Milan',
         password: 'Comitqa123',
-        name: 'Milan',
+        name: 'Milan Ivanovic',
         role: 'admin' as const
       },
       {
         id: '4',
         username: 'Vlada',
         password: 'Comitqa123',
-        name: 'Vlada',
+        name: 'Vladimir Vasiljevic ',
         role: 'admin' as const
       },
       // Legacy admin account (keep for compatibility)
