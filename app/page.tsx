@@ -16,7 +16,12 @@ export default function Home() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const qaTeamMembers = ['NemanjaN', 'NemanjaP', 'Milan', 'Vlada']
+  const qaTeamMembers = [
+    { username: 'NemanjaN', name: 'Nemanja Nikitovic' },
+    { username: 'NemanjaP', name: 'Nemanja Pavlovic' },
+    { username: 'Milan', name: 'Milan Ivanovic' },
+    { username: 'Vlada', name: 'Vladimir Vasiljevic' }
+  ]
 
   useEffect(() => {
     const user = getCurrentUser()
@@ -146,7 +151,7 @@ export default function Home() {
                   >
                     <option value="">-- Select your name --</option>
                     {qaTeamMembers.map(member => (
-                      <option key={member} value={member}>{member}</option>
+                      <option key={member.username} value={member.username}>{member.name}</option>
                     ))}
                   </select>
                 </div>
