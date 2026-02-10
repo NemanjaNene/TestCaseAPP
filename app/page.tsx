@@ -216,9 +216,9 @@ export default function Home() {
                       title={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
-                        <Eye className="w-5 h-5" />
-                      ) : (
                         <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
                       )}
                     </button>
                   </div>
