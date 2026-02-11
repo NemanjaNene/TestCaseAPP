@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { TestRun, TestRunResult } from '@/types'
-import { PlayCircle, Calendar, User, CheckCircle2, TrendingUp, Trash2, Eye } from 'lucide-react'
+import { PlayCircle, Calendar, User, CheckCircle2, TrendingUp, Trash2, Eye, XCircle, SkipForward, Ban } from 'lucide-react'
 import { loadTestRunResultsByTestRun, deleteTestRun, subscribeToTestRuns, loadTestRunsByProject } from '@/utils/storage'
 
 interface TestRunListProps {
@@ -160,7 +160,7 @@ export default function TestRunList({ projectId, onSelectTestRun, onCreateNew }:
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-blue-500/20 text-blue-400'
                   }`}>
-                    {isCompleted ? '✅ Completed' : '🟡 In Progress'}
+                    {isCompleted ? 'Completed' : 'In Progress'}
                   </span>
                 </div>
 
@@ -189,14 +189,17 @@ export default function TestRunList({ projectId, onSelectTestRun, onCreateNew }:
                     Pass: <strong>{stats.pass}</strong>
                   </span>
                   <span className="flex items-center gap-1 text-red-400">
-                    ✕ Fail: <strong>{stats.fail}</strong>
+                    <XCircle className="w-4 h-4" />
+                    Fail: <strong>{stats.fail}</strong>
                   </span>
                   <span className="flex items-center gap-1 text-yellow-400">
-                    ⏭️ Skip: <strong>{stats.skip}</strong>
+                    <SkipForward className="w-4 h-4" />
+                    Skip: <strong>{stats.skip}</strong>
                   </span>
                   {stats.blocked > 0 && (
                     <span className="flex items-center gap-1 text-orange-400">
-                      🚫 Blocked: <strong>{stats.blocked}</strong>
+                      <Ban className="w-4 h-4" />
+                      Blocked: <strong>{stats.blocked}</strong>
                     </span>
                   )}
                   {stats.executed > 0 && (

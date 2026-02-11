@@ -111,7 +111,7 @@ export default function TestRunExecution({ testRun, onBack, onViewReport }: Test
         setCurrentIndex(currentIndex + 1)
       }
     } catch (error) {
-      console.error('❌ Error marking test result:', error)
+      console.error('Error marking test result:', error)
       // Don't show alert, just log the error
       console.error('Note: Result may have been saved to localStorage')
     }
@@ -235,10 +235,10 @@ export default function TestRunExecution({ testRun, onBack, onViewReport }: Test
                       <div className="flex items-center gap-2">
                         <p className="text-xs text-gray-400">Test {index + 1} of {testCases.length}</p>
                         {result?.comment && (
-                          <span className="text-xs text-blue-400" title="Has comment">💬</span>
+                          <span className="text-xs text-blue-400" title="Has comment">Note</span>
                         )}
                         {result?.bugId && (
-                          <span className="text-xs text-red-400" title={`Bug: ${result.bugId}`}>🐛</span>
+                          <span className="text-xs text-red-400" title={`Bug: ${result.bugId}`}>Bug</span>
                         )}
                       </div>
                     </div>
@@ -375,7 +375,7 @@ export default function TestRunExecution({ testRun, onBack, onViewReport }: Test
         {/* Previous Execution Result */}
         {currentResult && (
           <div className="mb-6 p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-            <p className="text-sm font-semibold text-blue-400 mb-2">📋 Previous Execution:</p>
+            <p className="text-sm font-semibold text-blue-400 mb-2">Previous Execution:</p>
             <div className="space-y-1 text-sm">
               <div>
                 <span className="text-gray-400">Status: </span>

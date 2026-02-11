@@ -140,7 +140,7 @@ export default function TestRunDashboard({ projectId, testSuites }: TestRunDashb
               ? 'bg-green-500/20 text-green-400'
               : 'bg-blue-500/20 text-blue-400'
           }`}>
-            {latestRun.status === 'completed' ? '✅ Completed' : '🟡 In Progress'}
+            {latestRun.status === 'completed' ? 'Completed' : 'In Progress'}
           </span>
         </div>
 
@@ -222,10 +222,20 @@ export default function TestRunDashboard({ projectId, testSuites }: TestRunDashb
                 <div key={suite.id} className="p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
                   <p className="font-semibold mb-2">{suite.name}</p>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-green-400">✅ {suitePass}</span>
-                    <span className="text-red-400">❌ {suiteFail}</span>
-                    <span className="text-yellow-400">⏭️ {suiteSkip}</span>
-                    {suiteBlocked > 0 && <span className="text-orange-400">🚫 {suiteBlocked}</span>}
+                    <span className="text-green-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> {suitePass}
+                    </span>
+                    <span className="text-red-400 flex items-center gap-1">
+                      <XCircle className="w-3 h-3" /> {suiteFail}
+                    </span>
+                    <span className="text-yellow-400 flex items-center gap-1">
+                      <SkipForward className="w-3 h-3" /> {suiteSkip}
+                    </span>
+                    {suiteBlocked > 0 && (
+                      <span className="text-orange-400 flex items-center gap-1">
+                        <Ban className="w-3 h-3" /> {suiteBlocked}
+                      </span>
+                    )}
                     <span className="text-gray-500 ml-auto">({suiteTotal} total)</span>
                   </div>
                 </div>
